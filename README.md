@@ -5,6 +5,5 @@ This program is written in Python and very user-friendly. It follows the theory 
 
 If you are interested in this program, please contact panmingen@uchicago.edu
 
-![Alt text](https://raw.githubusercontent.com/mingen-pan/solar-system-condensation-public-/master/path/to/condensate_example.png)
+<img width="437" alt="condensate_example" src="https://user-images.githubusercontent.com/33992012/33250803-6c27bef8-d2f8-11e7-8f8b-7e8271471838.png">
 
-![Alt text](/relative/path/to/condensate_example.png)
