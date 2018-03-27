@@ -1,4 +1,6 @@
-# solar-system-condensation-public-
+## UNICON – A Universal Condensation model for cosmochemical and planetary-science study
+### The first open-source scientifc program for thermodynamic condensation
+
 Using thermodynamic equilibrium to calculate the condensation of the early solar system
 
 This program is written in Python and very user-friendly. It follows the theory of Grossman (1972) and Yoneda & Grossman (1995). Solar abundance data is taken from Lodders (2003). Thermodynamic data is from JANAF and Robie & Hemingway (1995).
