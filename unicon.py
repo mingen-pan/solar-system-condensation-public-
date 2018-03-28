@@ -9,6 +9,7 @@ def initialization(p_ref = 1e6/2.43e10*1e-3*2):
     global Elements, Gas_species_list, Monoatom_dict, Potential_solid_species_list, \
     Existing_solid_species_list, Solid_species_dict,Endmember_dict, Potential_solid_solution_species_list, \
     Existing_solid_solution_species_list, Solid_solution_species_dict, Isolation_dict
+    global T
     Elements = {}
     Gas_species_list = []
     Monoatom_dict = {}
@@ -62,7 +63,7 @@ class Monoatom_species():
             self.G_vs_T = G_vs_T
         Monoatom_dict[name] = self
         Elements[name].gas_species_list.append((self, 1))
-    def G(self, T):
+    def G(self):
         if self.transition_temp == -1:
             return Gibbs_energy_fit(T, *self.para)
         if self.transition_temp > 0:
@@ -90,18 +91,18 @@ class Gas_species():
         Gas_species_list.append(self)
         for key, value in self.formula.items():
             Elements[key].gas_species_list.append((self, value))
-    def G(self, T):
+    def G(self):
         if self.transition_temp == -1:
             return Gibbs_energy_fit(T, *self.para)
         if self.transition_temp > 0:
             return np.interp(T, self.G_vs_T[:,0], self.G_vs_T[:,1])
-    def update_pressure(self, Monoatom_dict, T):
+    def update_pressure(self):
         log_p = 0
-        log_K = -self.G(T)
+        log_K = -self.G()
         for key, value in self.formula.items():
             # key is the element name and value is the number
             log_p += value * Monoatom_dict[key].log_pressure
-            log_K += value * Monoatom_dict[key].G(T)
+            log_K += value * Monoatom_dict[key].G()
         log_K = log_K*1e3/(8.314*T)
         self.pressure = math.exp(log_K + log_p)
         
@@ -123,18 +124,18 @@ class Solid_species():
             self.G_vs_T = G_vs_T
         Potential_solid_species_list.append(self)
         Solid_species_dict[name] = self
-    def G(self, T):
+    def G(self):
         if self.transition_temp == -1:
             return Gibbs_energy_fit(T, *self.para)
         if self.transition_temp > 0:
             return np.interp(T, self.G_vs_T[:,0], self.G_vs_T[:,1])
-    def equilibrium(self, Monoatom_dict, T):
+    def equilibrium(self):
         log_p = 0
-        log_K = -self.G(T)
+        log_K = -self.G()
         for key, value in self.formula.items():
             # key is the element name and value is the number
             log_p += value * Monoatom_dict[key].log_pressure
-            log_K += value * Monoatom_dict[key].G(T)
+            log_K += value * Monoatom_dict[key].G()
         log_K = log_K*1e3/(8.314*T)
         return log_K + log_p
     def update_f_pressure(self, fp):
@@ -154,18 +155,18 @@ class Endmember_species():
         else:
             self.G_vs_T = G_vs_T
         Endmember_dict[name] = self
-    def G(self, T):
+    def G(self):
         if self.transition_temp == -1:
             return Gibbs_energy_fit(T, *self.para)
         if self.transition_temp > 0:
             return np.interp(T, self.G_vs_T[:,0], self.G_vs_T[:,1])
-    def equilibrium(self, Monoatom_dict, T):
+    def equilibrium(self):
         log_p = 0
-        G = -self.G(T)
+        G = -self.G()
         for key, value in self.formula.items():
             # key is the element name and value is the number
             log_p += value * Monoatom_dict[key].log_pressure
-            G += value * Monoatom_dict[key].G(T)
+            G += value * Monoatom_dict[key].G()
         G = G*1e3
         return G + log_p*8.314*T
             
@@ -203,7 +204,7 @@ class solid_solution_species():
         self.solution_type = solution_type
         Potential_solid_solution_species_list.append(self)
         Solid_solution_species_dict[name] = self
-    def G(self, T):
+    def G(self):
         G = 0
         for key, pos in self.endmember.items():
             G += Endmember_dict[key].G(T)* self.X[pos]
@@ -220,30 +221,29 @@ class solid_solution_species():
     def update_bounded_X(self, X):
         assert len(X) == len(self.endmember) - 1, "the bounded X should have dim of N - 1"
         tot_X = np.sum(X)
-#         assert tot_X < 1
         X = np.append(X, 1 - tot_X)
         self.X = X
-    def equilibrium(self, Monoatom_dict, T):
+    def equilibrium(self):
         eqn = 0
         #eqn = [G0-i - sum(G0_gas_i) - RT*sum(log_p_gas_i)] - [G0-n - sum(G0_gas_n) - RT*sum(log_p_gas_n)] + dG_mix/dX
         for num, key in enumerate(self.endmember.keys()):
-            eqn -= Endmember_dict[key].equilibrium(Monoatom_dict, T) * self.X[num]
+            eqn -= Endmember_dict[key].equilibrium() * self.X[num]
         eqn += self.G_mix(self.X, T)
         return eqn
-    def equilibrium_prime(self, Monoatom_dict, T):
+    def equilibrium_prime(self):
         eqn = np.zeros(len(self.endmember) - 1)
         #eqn = [G0-i - sum(G0_gas_i) - RT*sum(log_p_gas_i)] - [G0-n - sum(G0_gas_n) - RT*sum(log_p_gas_n)] + dG_mix/dX
         keys = list(self.endmember.keys())
         for num, key in enumerate(keys[:-1]):
-            eqn[num] = Endmember_dict[keys[-1]].equilibrium(Monoatom_dict, T) \
-            - Endmember_dict[key].equilibrium(Monoatom_dict, T)
+            eqn[num] = Endmember_dict[keys[-1]].equilibrium() \
+            - Endmember_dict[key].equilibrium()
         eqn += self.G_mix_prime(self.X, T)
         return eqn
-    def _equilibrium(self, bounded_X, Monoatom_dict, T):
+    def _equilibrium(self, bounded_X):
         self.update_bounded_X(bounded_X)
-        return self.equilibrium(Monoatom_dict, T)
-    def _equilibrium_prime(self, bounded_X, Monoatom_dict, T):
+        return self.equilibrium()
+    def _equilibrium_prime(self, bounded_X):
         self.update_bounded_X(bounded_X)
-        return self.equilibrium_prime(Monoatom_dict, T)
+        return self.equilibrium_prime()
         
 

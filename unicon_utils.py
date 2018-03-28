@@ -48,24 +48,24 @@ def del_solid_solution(solid):
         del unicon.Elements[key].solid_solution_species_dict[solid]
 
 
-def check_potential_solid(T):
+def check_potential_solid():
     flag = 0
     for solid in unicon.Potential_solid_species_list:
-        if solid.equilibrium(unicon.Monoatom_dict, T) >= 1e-9:
+        if solid.equilibrium() >= 1e-9:
             flag = 1
             add_solid(solid)
         
     for solid in unicon.Potential_solid_solution_species_list:
         X = solid.X
         X = X[:-1]
-        X = fmin_tnc(solid._equilibrium, X, args = (unicon.Monoatom_dict, T), fprime = solid._equilibrium_prime, bounds = [(0.000000001,0.99999999999)])
+        X = fmin_tnc(solid._equilibrium, X, fprime = solid._equilibrium_prime, bounds = [(0.000000001,0.99999999999)])
         X = X[0]
-        if solid._equilibrium(X, unicon.Monoatom_dict, T) <= -1e-9:
+        if solid._equilibrium(X) <= -1e-9:
             flag = 1
             add_solid_solution(solid)                                     
     return flag
                 
-def check_existing_solid(T):
+def check_existing_solid():
     flag = 0
     for solid in unicon.Existing_solid_species_list:
         if solid.pressure < 0:
@@ -136,7 +136,7 @@ def state_change(T0, P_0, Tf, P_f, P_change_rate = 1.001):
 	    P_step = np.exp(P_step)
 	    for P in P_step:
 	        change_p_tot(P)
-	        x = update_state(x, t)
+	        x = update_state(x)
 	        
 	elif type(P_0) == list or type(P_0) == np.array:
 	    log_P_f = np.log(P_f)
@@ -151,7 +151,7 @@ def state_change(T0, P_0, Tf, P_f, P_change_rate = 1.001):
 	    P_element = P_element_0
 	    for P in P_step.T:
 	        change_p_tot(P)
-	        x = update_state(x, t)
+	        x = update_state(x)
 	return x
 
 
@@ -240,31 +240,31 @@ def encode_x(x, species):
     # for gas in unicon.Gas_species_list:
     #         gas.update_pressure(unicon.Monoatom_dict, T)
 
-def mass_balance(x, T):
+def mass_balance(x):
     input_x(x)
     eqn = []
     for gas in unicon.Gas_species_list:
-        gas.update_pressure(unicon.Monoatom_dict, T)
+        gas.update_pressure()
     for element in unicon.Elements.values():
         eqn.append(element.mass_balance()/element.p_tot)
     for solid in unicon.Existing_solid_species_list:
-        eqn.append(solid.equilibrium(unicon.Monoatom_dict, T))
+        eqn.append(solid.equilibrium())
     for solid in unicon.Existing_solid_solution_species_list:
-        eqn.append(solid.equilibrium(unicon.Monoatom_dict, T))
-        prime = solid.equilibrium_prime(unicon.Monoatom_dict, T)
+        eqn.append(solid.equilibrium())
+        prime = solid.equilibrium_prime()
         if type(prime) is np.array:
             eqn += prime.tolist()
         else:
             eqn.append(prime)
     return eqn
 
-def update_state(x, t):
-    if check_potential_solid(t) or check_existing_solid(t):
+def update_state(x):
+    if check_potential_solid() or check_existing_solid():
         x = extract_x()
-    x = fsolve(mass_balance, x, args = (t))
-    while check_potential_solid(t) or check_existing_solid(t):
+    x = fsolve(mass_balance, x)
+    while check_potential_solid() or check_existing_solid():
         x = extract_x()
-        x = fsolve(mass_balance, x, args = (t))
+        x = fsolve(mass_balance, x)
     return x
 
 
